@@ -39,9 +39,9 @@
 
 void tinypcminfo_print_help(const char *argv0)
 {
-    fprintf(stderr, "usage: %s [options]\n", argv0);
+    fprintf(stderr, "Usage: %s [options]\n", argv0);
     fprintf(stderr, "\n");
-    fprintf(stderr, "options:\n");
+    fprintf(stderr, "Options:\n");
     fprintf(stderr, "\t-D, --card   <card-number>\n");
     fprintf(stderr, "\t-d, --device <device-number>\n");
 }
@@ -133,12 +133,12 @@ int main(int argc, char **argv)
         int c = getopt_long(argc, argv, "D:d:hv", opts, NULL);
         if (c == 'D') {
             if (sscanf(optarg, "%u", &card) != 1) {
-                fprintf(stderr, "failed parsing card '%s'\n", optarg);
+                fprintf(stderr, "Failed parsing card '%s'.\n", optarg);
                 return EXIT_FAILURE;
             }
         } else if (c == 'd') {
             if (sscanf(optarg, "%u", &device) != 1) {
-                fprintf(stderr, "failed parsing device '%s'\n", optarg);
+                fprintf(stderr, "Failed parsing device '%s'.\n", optarg);
                 return EXIT_FAILURE;
             }
         } else if (c == 'h') {
