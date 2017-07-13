@@ -27,6 +27,8 @@
 */
 
 #include <tinyalsa/asoundlib.h>
+#include <getopt.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +36,21 @@
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof((x)[0]))
 #endif
+
+void tinypcminfo_print_help(const char *argv0)
+{
+    fprintf(stderr, "usage: %s [options]\n", argv0);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "options:\n");
+    fprintf(stderr, "\t-D, --card   <card-number>\n");
+    fprintf(stderr, "\t-d, --device <device-number>\n");
+}
+
+void tinypcminfo_print_version(const char *argv0)
+{
+    fprintf(stderr, "%s (tinyalsa %s)\n",
+            argv0, TINYALSA_VERSION_STRING);
+}
 
 /* The format_lookup is in order of SNDRV_PCM_FORMAT_##index and
  * matches the grouping in sound/asound.h.  Note this is not
@@ -103,26 +120,42 @@ int main(int argc, char **argv)
     unsigned int card = 0;
     int i;
 
-    if ((argc == 2) && (strcmp(argv[1], "--help") == 0)) {
-        fprintf(stderr, "Usage: %s -D card -d device\n", argv[0]);
-        return 1;
-    }
+    struct option opts[] =
+    {
+        { "card", required_argument, NULL, 'D' },
+        { "device", required_argument, NULL, 'd' },
+        { "help", no_argument, NULL, 'h' },
+        { "version", no_argument, NULL, 'v' },
+        { 0, 0, 0, 0 }
+    };
 
-    /* parse command line arguments */
-    argv += 1;
-    while (*argv) {
-        if (strcmp(*argv, "-D") == 0) {
-            argv++;
-            if (*argv)
-                card = atoi(*argv);
+    while (true) {
+        int c = getopt_long(argc, argv, "D:d:hv", opts, NULL);
+        if (c == 'D') {
+            if (sscanf(optarg, "%u", &card) != 1) {
+                fprintf(stderr, "failed parsing card '%s'\n", optarg);
+                return EXIT_FAILURE;
+            }
+        } else if (c == 'd') {
+            if (sscanf(optarg, "%u", &device) != 1) {
+                fprintf(stderr, "failed parsing device '%s'\n", optarg);
+                return EXIT_FAILURE;
+            }
+        } else if (c == 'h') {
+            tinypcminfo_print_help(argv[0]);
+            return EXIT_FAILURE;
+        } else if (c == 'v') {
+            tinypcminfo_print_version(argv[0]);
+            return EXIT_FAILURE;
+        } else if (c == '?') {
+            /* error occured */
+            /* getopt_long() printed a
+             * message already. */
+            return EXIT_FAILURE;
+        } else if (c == -1) {
+            /* end of options */
+            break;
         }
-        if (strcmp(*argv, "-d") == 0) {
-            argv++;
-            if (*argv)
-                device = atoi(*argv);
-        }
-        if (*argv)
-            argv++;
     }
 
     printf("Info for card %u, device %u:\n", card, device);

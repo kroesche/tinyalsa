@@ -27,13 +27,14 @@
 */
 
 #include <tinyalsa/asoundlib.h>
+#include <ctype.h>
 #include <errno.h>
+#include <getopt.h>
+#include <limits.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <getopt.h>
-#include <ctype.h>
 #include <string.h>
-#include <limits.h>
 
 static void tinymix_list_controls(struct mixer *mixer, int print_all);
 
@@ -44,23 +45,26 @@ static void tinymix_set_value(struct mixer *mixer, const char *control,
 
 static void tinymix_print_enum(struct mixer_ctl *ctl);
 
-void usage(void)
+void usage(const char *argv0)
 {
-    printf("usage: tinymix [options] <command>\n");
-    printf("options:\n");
-    printf("\t-h, --help        : prints this help message and exists\n");
-    printf("\t-v, --version     : prints this version of tinymix and exists\n");
-    printf("\t-D, --card NUMBER : specifies the card number of the mixer\n");
-    printf("commands:\n");
-    printf("\tget NAME|ID       : prints the values of a control\n");
-    printf("\tset NAME|ID VALUE : sets the value of a control\n");
-    printf("\tcontrols          : lists controls of the mixer\n");
-    printf("\tcontents          : lists controls of the mixer and their contents\n");
+    fprintf(stderr, "Usage: %s [options] <command>\n", argv0);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Options:\n");
+    fprintf(stderr, "\t-h, --help        : prints this help message and exists.\n");
+    fprintf(stderr, "\t-v, --version     : prints this version of tinymix and exists.\n");
+    fprintf(stderr, "\t-D, --card NUMBER : specifies the card number of the mixer.\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Commands:\n");
+    fprintf(stderr, "\tget NAME|ID       : prints the values of a control.\n");
+    fprintf(stderr, "\tset NAME|ID VALUE : sets the value of a control.\n");
+    fprintf(stderr, "\tcontrols          : lists controls of the mixer.\n");
+    fprintf(stderr, "\tcontents          : lists controls of the mixer and their contents.\n");
 }
 
-void version(void)
+void version(const char *argv0)
 {
-    printf("tinymix version 2.0 (tinyalsa version %s)\n", TINYALSA_VERSION_STRING);
+    fprintf(stderr, "%s (tinyalsa %s)\n",
+            argv0, TINYALSA_VERSION_STRING);
 }
 
 int main(int argc, char **argv)
@@ -69,33 +73,36 @@ int main(int argc, char **argv)
     int card = 0;
     char *cmd;
 
-    while (1) {
-        static struct option long_options[] = {
-            { "version", no_argument, NULL, 'v' },
-            { "help",    no_argument, NULL, 'h' },
-            { 0, 0, 0, 0 }
-        };
+    static struct option long_options[] = {
+        { "card", required_argument, NULL, 'D' },
+        { "device", required_argument, NULL, 'd' },
+        { "version", no_argument, NULL, 'v' },
+        { "help",    no_argument, NULL, 'h' },
+        { 0, 0, 0, 0 }
+    };
 
-        /* getopt_long stores the option index here. */
-        int option_index = 0;
-        int c = 0;
-
-        c = getopt_long (argc, argv, "c:D:hv", long_options, &option_index);
-
-        /* Detect the end of the options. */
-        if (c == -1)
+    while (true) {
+        int c = getopt_long (argc, argv, "D:d:hv", long_options, NULL);
+        if (c == 'D') {
+            if (sscanf(optarg, "%u", &card) != 1) {
+                fprintf(stderr, "Failed parsing card number '%s'.\n", optarg);
+                return EXIT_FAILURE;
+            }
+        } else if (c == 'h') {
+            usage(argv[0]);
+            return EXIT_FAILURE;
+        } else if (c == 'v') {
+            version(argv[0]);
+            return EXIT_FAILURE;
+        } else if (c == '?') {
+            /* error occured */
+            return EXIT_FAILURE;
+        } else if (c == -1) {
+            /* end of options */
             break;
-
-        switch (c) {
-        case 'D':
-            card = atoi(optarg);
-            break;
-        case 'h':
-            usage();
-            return EXIT_SUCCESS;
-        case 'v':
-            version();
-            return EXIT_SUCCESS;
+        } else {
+            /* unhandled */
+            return EXIT_FAILURE;
         }
     }
 
@@ -105,12 +112,15 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
-    cmd = argv[optind];
-    if (cmd == NULL) {
+    if (optind >= argc) {
         fprintf(stderr, "no command specified (see --help)\n");
         mixer_close(mixer);
         return EXIT_FAILURE;
-    } else if (strcmp(cmd, "get") == 0) {
+    }
+
+    cmd = argv[optind];
+
+    if (strcmp(cmd, "get") == 0) {
         if ((optind + 1) >= argc) {
             fprintf(stderr, "no control specified\n");
             mixer_close(mixer);
@@ -129,7 +139,7 @@ int main(int argc, char **argv)
             mixer_close(mixer);
             return EXIT_FAILURE;
         }
-        tinymix_set_value(mixer, argv[optind + 1], &argv[optind + 2], argc - 3);
+        tinymix_set_value(mixer, argv[optind + 1], &argv[optind + 2], argc - (optind + 2));
     } else if (strcmp(cmd, "controls") == 0) {
         tinymix_list_controls(mixer, 0);
     } else if (strcmp(cmd, "contents") == 0) {
