@@ -27,11 +27,34 @@
 */
 
 #include <tinyalsa/asoundlib.h>
+#include <getopt.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <signal.h>
+
+void tinyplay_print_help(const char *argv0)
+{
+    fprintf(stderr, "usage: %s [options] file\n", argv0);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "options:\n");
+    fprintf(stderr, "  -D, --card   <card number>    The device to receive the audio\n");
+    fprintf(stderr, "  -d, --device <device number>  The card to receive the audio\n");
+    fprintf(stderr, "  -p, --period-size <size>      The size of the PCM's period\n");
+    fprintf(stderr, "  -n, --period-count <count>    The number of PCM periods\n");
+    fprintf(stderr, "  -i, --file-type <file-type >  The type of file to read (raw or wav)\n");
+    fprintf(stderr, "  -c, --channels <count>        The amount of channels per frame\n");
+    fprintf(stderr, "  -r, --rate <rate>             The amount of frames per second\n");
+    fprintf(stderr, "  -f, --format <format>         The sample format of the PCM\n");
+}
+
+void tinyplay_print_version(const char *argv0)
+{
+    fprintf(stderr, "%s (tinyalsa v%s)\n",
+            argv0, TINYALSA_VERSION_STRING);
+}
 
 struct cmd {
     const char *filename;
@@ -61,86 +84,95 @@ void cmd_init(struct cmd *cmd)
     cmd->bits = 16;
 }
 
-int cmd_parse_arg(struct cmd *cmd, int argc, const char **argv)
+int cmd_parse_args(struct cmd *cmd, int argc, char **argv)
 {
-    if (argc < 1) {
-        return 0;
-    }
+    struct option opts[] =
+    {
+        { "card", required_argument, NULL, 'D' },
+        { "device", required_argument, NULL, 'd' },
+        { "period-size", required_argument, NULL, 'p' },
+        { "period-count", required_argument, NULL, 'P' },
+        { "channels", required_argument, NULL, 'c' },
+        { "rate", required_argument, NULL, 'r' },
+        { "file-type", required_argument, NULL, 'i' },
+        { "format", required_argument, NULL, 'f' },
+        { "help", no_argument, NULL, 'h' },
+        { "version", no_argument, NULL, 'v' },
+        { 0, 0, 0, 0 }
+    };
 
-    if ((strcmp(argv[0], "-M") == 0) || (strcmp(argv[0], "--mmap") == 0)) {
-        cmd->flags |= PCM_MMAP;
-        return 1;
-    }
-
-    if (argv[0][0] != '-') {
-        cmd->filename = argv[0];
-        return 1;
-    }
-
-    if (argc < 2) {
-        fprintf(stderr, "option '%s' is missing argument\n", argv[0]);
-        return -1;
-    }
-
-    if ((strcmp(argv[0], "-D") == 0) || (strcmp(argv[0], "--card") == 0)) {
-        if (sscanf(argv[1], "%u", &cmd->card) != 1) {
-            fprintf(stderr, "failed parsing card number '%s'\n", argv[1]);
-            return -1;
-        }
-    } else if ((strcmp(argv[0], "-d") == 0) || (strcmp(argv[0], "--device") == 0)) {
-        if (sscanf(argv[1], "%u", &cmd->device) != 1) {
-            fprintf(stderr, "failed parsing device number '%s'\n", argv[1]);
-            return -1;
-        }
-    } else if ((strcmp(argv[0], "-p") == 0) || (strcmp(argv[0], "--period-size") == 0)) {
-        if (sscanf(argv[1], "%u", &cmd->config.period_size) != 1) {
-            fprintf(stderr, "failed parsing period size '%s'\n", argv[1]);
-            return -1;
-        }
-    } else if ((strcmp(argv[0], "-p") == 0) || (strcmp(argv[0], "--period-count") == 0)) {
-        if (sscanf(argv[1], "%u", &cmd->config.period_count) != 1) {
-            fprintf(stderr, "failed parsing period count '%s'\n", argv[1]);
-            return -1;
-        }
-    } else if ((strcmp(argv[0], "-c") == 0) || (strcmp(argv[0], "--channels") == 0)) {
-        if (sscanf(argv[1], "%u", &cmd->config.channels) != 1) {
-            fprintf(stderr, "failed parsing channel count '%s'\n", argv[1]);
-            return -1;
-        }
-    } else if ((strcmp(argv[0], "-r") == 0) || (strcmp(argv[0], "--rate") == 0)) {
-        if (sscanf(argv[1], "%u", &cmd->config.rate) != 1) {
-            fprintf(stderr, "failed parsing rate '%s'\n", argv[1]);
-            return -1;
-        }
-    } else if ((strcmp(argv[0], "-i") == 0) || (strcmp(argv[0], "--file-type") == 0)) {
-        cmd->filetype = argv[1];
-    } else {
-        fprintf(stderr, "unknown option '%s'\n", argv[0]);
-        return -1;
-    }
-    return 2;
-}
-
-int cmd_parse_args(struct cmd *cmd, int argc, const char **argv)
-{
-    int i = 0;
-    while (i < argc) {
-        int j = cmd_parse_arg(cmd, argc - i, &argv[i]);
-        if (j < 0){
+    while (true) {
+        int c = getopt_long(argc, argv, "D:d:p:P:c:r:f:i:hv", opts, NULL);
+        if (c == 'D') {
+            if (sscanf(optarg, "%u", &cmd->card) != 1) {
+                fprintf(stderr, "failed parsing card number '%s'\n", argv[1]);
+                return EXIT_FAILURE;
+            }
+        } else if (c == 'd') {
+            if (sscanf(optarg, "%u", &cmd->device) != 1) {
+                fprintf(stderr, "failed parsing device number '%s'\n", argv[1]);
+                return EXIT_FAILURE;
+            }
+        } else if (c == 'p') {
+            if (sscanf(optarg, "%u", &cmd->config.period_size) != 1) {
+                fprintf(stderr, "failed parsing period size '%s'\n", argv[1]);
+                return EXIT_FAILURE;
+            }
+        } else if (c == 'P') {
+            if (sscanf(optarg, "%u", &cmd->config.period_count) != 1) {
+                fprintf(stderr, "failed parsing period count '%s'\n", argv[1]);
+                return EXIT_FAILURE;
+            }
+        } else if (c == 'c') {
+            if (sscanf(optarg, "%u", &cmd->config.channels) != 1) {
+                fprintf(stderr, "failed parsing channels '%s'\n", argv[1]);
+                return EXIT_FAILURE;
+            }
+        } else if (c == 'f') {
+            /* TODO */
+            fprintf(stderr, "format specifier not currently supported\n");
+            return EXIT_FAILURE;
+        } else if (c == 'r') {
+            if (sscanf(optarg, "%u", &cmd->config.rate) != 1) {
+                fprintf(stderr, "failed parsing rate '%s'\n", argv[1]);
+                return EXIT_FAILURE;
+            }
+        } else if (c == 'i') {
+            cmd->filetype = optarg;
+        } else if (c == 'h') {
+            tinyplay_print_help(argv[0]);
+            return EXIT_FAILURE;
+        } else if (c == 'v') {
+            tinyplay_print_version(argv[0]);
+            return EXIT_FAILURE;
+        } else if (c == '?') {
+            /* error occured */
+            return EXIT_FAILURE;
+        } else if (c == -1) {
+            /* end of options */
             break;
         }
-        i += j;
     }
 
-    if ((cmd->filename != NULL)
-     && (cmd->filetype == NULL)) {
+    if (optind >= argc) {
+        fprintf(stderr, "file name not specified\n");
+        fprintf(stderr, "  see --help or -h\n");
+        return EXIT_FAILURE;
+    } else {
+        cmd->filename = argv[optind];
+    }
+
+    /* if file type wasn't specified
+     * in an option */
+    if (cmd->filetype == NULL) {
+        /* detect what file type to use */
         cmd->filetype = strrchr(cmd->filename, '.');
         if (cmd->filetype != NULL) {
             cmd->filetype++;
         }
     }
 
-    return i;
+    return EXIT_SUCCESS;
 }
 
 #define ID_RIFF 0x46464952
@@ -182,11 +214,6 @@ int ctx_init(struct ctx* ctx, const struct cmd *cmd)
 {
     unsigned int bits = cmd->bits;
     struct pcm_config config = cmd->config;
-
-    if (cmd->filename == NULL) {
-        fprintf(stderr, "filename not specified\n");
-        return -1;
-    }
 
     ctx->file = fopen(cmd->filename, "rb");
     if (ctx->file == NULL) {
@@ -294,33 +321,13 @@ void stream_close(int sig)
     close = 1;
 }
 
-void print_usage(const char *argv0)
-{
-    fprintf(stderr, "usage: %s file.wav [options]\n", argv0);
-    fprintf(stderr, "options:\n");
-    fprintf(stderr, "-D | --card   <card number>    The device to receive the audio\n");
-    fprintf(stderr, "-d | --device <device number>  The card to receive the audio\n");
-    fprintf(stderr, "-p | --period-size <size>      The size of the PCM's period\n");
-    fprintf(stderr, "-n | --period-count <count>    The number of PCM periods\n");
-    fprintf(stderr, "-i | --file-type <file-type >  The type of file to read (raw or wav)\n");
-    fprintf(stderr, "-c | --channels <count>        The amount of channels per frame\n");
-    fprintf(stderr, "-r | --rate <rate>             The amount of frames per second\n");
-    fprintf(stderr, "-b | --bits <bit-count>        The number of bits in one sample\n");
-    fprintf(stderr, "-M | --mmap                    Use memory mapped IO to play audio\n");
-}
-
-int main(int argc, const char **argv)
+int main(int argc, char **argv)
 {
     struct cmd cmd;
     struct ctx ctx;
 
-    if (argc < 2) {
-        print_usage(argv[0]);
-        return EXIT_FAILURE;
-    }
-
     cmd_init(&cmd);
-    if (cmd_parse_args(&cmd, argc - 1, &argv[1]) < 0) {
+    if (cmd_parse_args(&cmd, argc, argv) != EXIT_SUCCESS) {
         return EXIT_FAILURE;
     }
 
