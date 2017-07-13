@@ -27,6 +27,8 @@
 */
 
 #include <tinyalsa/asoundlib.h>
+#include <getopt.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -72,6 +74,28 @@ void sigint_handler(int sig)
     }
 }
 
+void tinycap_print_help(const char *argv0)
+{
+    fprintf(stderr, "Usage: %s [options] file.\n", argv0);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Options:\n");
+    fprintf(stderr, "\t-D, --card\n");
+    fprintf(stderr, "\t-d, --device\n");
+    fprintf(stderr, "\t-c, --channels\n");
+    fprintf(stderr, "\t-r, --rate\n");
+    fprintf(stderr, "\t-p, --period-size\n");
+    fprintf(stderr, "\t-P, --period-count\n");
+    fprintf(stderr, "\t-t, --time\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "The file argument may be a path to a file or stdout, indicated by '--'.\n");
+}
+
+void tinycap_print_version(const char *argv0)
+{
+    fprintf(stderr, "%s (tinyalsa %s)\n",
+            argv0, TINYALSA_VERSION_STRING);
+}
+
 int main(int argc, char **argv)
 {
     FILE *file;
@@ -81,70 +105,98 @@ int main(int argc, char **argv)
     unsigned int channels = 2;
     unsigned int rate = 48000;
     unsigned int bits = 16;
-    unsigned int frames;
+    unsigned int frames = 0;
     unsigned int period_size = 1024;
     unsigned int period_count = 4;
     unsigned int capture_time = UINT_MAX;
     enum pcm_format format;
     int no_header = 0;
 
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s {file.wav | --} [-D card] [-d device] [-c channels] "
-                "[-r rate] [-b bits] [-p period_size] [-n n_periods] [-t time_in_seconds]\n\n"
-                "Use -- for filename to send raw PCM to stdout\n", argv[0]);
-        return 1;
+    struct option opts[] =
+    {
+        { "card", required_argument, 0, 'D' },
+        { "device", required_argument, 0, 'd' },
+        { "channels", required_argument, 0, 'c' },
+        { "rate", required_argument, 0, 'r' },
+        { "period-size", required_argument, 0, 'p' },
+        { "period-count", required_argument, 0, 'P' },
+        { "time", required_argument, 0, 't' },
+        { 0, 0, 0, 0 }
+    };
+
+    while (true) {
+        int c = getopt_long(argc, argv, "D:d:c:r:p:P:t:hv", opts, NULL);
+        if (c == 'D') {
+            if (sscanf(optarg, "%u", &card) != 1) {
+                fprintf(stderr, "Failed parsing card number '%s'.\n", optarg);
+                return EXIT_FAILURE;
+            }
+        } else if (c == 'd') {
+            if (sscanf(optarg, "%u", &device) != 1) {
+                fprintf(stderr, "Failed parsing device number '%s'.\n", optarg);
+                return EXIT_FAILURE;
+            }
+        } else if (c == 'c') {
+            if (sscanf(optarg, "%u", &channels) != 1) {
+                fprintf(stderr, "Failed parsing channels '%s'.\n", optarg);
+                return EXIT_FAILURE;
+            }
+        } else if (c == 'r') {
+            if (sscanf(optarg, "%u", &rate) != 1) {
+                fprintf(stderr, "Failed parsing rate '%s'.\n", optarg);
+                return EXIT_FAILURE;
+            }
+        } else if (c == 'p') {
+            if (sscanf(optarg, "%u", &period_size) != 1) {
+                fprintf(stderr, "Failed parsing period size '%s'.\n", optarg);
+                return EXIT_FAILURE;
+            }
+        } else if (c == 'P') {
+            if (sscanf(optarg, "%u", &period_count) != 1) {
+                fprintf(stderr, "Failed parsing period_count '%s'.\n", optarg);
+                return EXIT_FAILURE;
+            }
+        } else if (c == 't') {
+            if (sscanf(optarg, "%u", &capture_time) != 1) {
+                fprintf(stderr, "Failed parsing capture time '%s'.\n", optarg);
+                return EXIT_FAILURE;
+            }
+        } else if (c == 'h') {
+            tinycap_print_help(argv[0]);
+            return EXIT_FAILURE;
+        } else if (c == 'v') {
+            tinycap_print_version(argv[0]);
+            return EXIT_FAILURE;
+        } else if (c == '?') {
+            /* error occured */
+            return EXIT_FAILURE;
+        } else if (c == -1) {
+            /* end of args */
+            break;
+        } else {
+            /* uhandled */
+            return EXIT_FAILURE;
+        }
     }
 
-    if (strcmp(argv[1],"--") == 0) {
+    const char *filename;
+    if (optind >= argc) {
+        fprintf(stderr, "No file specified.\n");
+        return EXIT_FAILURE;
+    } else {
+        filename = argv[optind];
+    }
+
+    if (strcmp(filename,"--") == 0) {
         file = stdout;
         prinfo = 0;
         no_header = 1;
     } else {
-        file = fopen(argv[1], "wb");
+        file = fopen(filename, "wb");
         if (!file) {
-            fprintf(stderr, "Unable to create file '%s'\n", argv[1]);
-            return 1;
+            fprintf(stderr, "Unable to create file '%s'.\n", argv[1]);
+            return EXIT_FAILURE;
         }
-    }
-
-    /* parse command line arguments */
-    argv += 2;
-    while (*argv) {
-        if (strcmp(*argv, "-d") == 0) {
-            argv++;
-            if (*argv)
-                device = atoi(*argv);
-        } else if (strcmp(*argv, "-c") == 0) {
-            argv++;
-            if (*argv)
-                channels = atoi(*argv);
-        } else if (strcmp(*argv, "-r") == 0) {
-            argv++;
-            if (*argv)
-                rate = atoi(*argv);
-        } else if (strcmp(*argv, "-b") == 0) {
-            argv++;
-            if (*argv)
-                bits = atoi(*argv);
-        } else if (strcmp(*argv, "-D") == 0) {
-            argv++;
-            if (*argv)
-                card = atoi(*argv);
-        } else if (strcmp(*argv, "-p") == 0) {
-            argv++;
-            if (*argv)
-                period_size = atoi(*argv);
-        } else if (strcmp(*argv, "-n") == 0) {
-            argv++;
-            if (*argv)
-                period_count = atoi(*argv);
-        } else if (strcmp(*argv, "-t") == 0) {
-            argv++;
-            if (*argv)
-                capture_time = atoi(*argv);
-        }
-        if (*argv)
-            argv++;
     }
 
     header.riff_id = ID_RIFF;
@@ -168,7 +220,7 @@ int main(int argc, char **argv)
         break;
     default:
         fprintf(stderr, "%u bits is not supported.\n", bits);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     header.bits_per_sample = pcm_format_to_bits(format);
@@ -187,7 +239,7 @@ int main(int argc, char **argv)
                             header.sample_rate, format,
                             period_size, period_count, capture_time);
     if (prinfo) {
-        printf("Captured %u frames\n", frames);
+        printf("Captured %u frames.\n", frames);
     }
 
     /* write header now all information is known */
@@ -200,7 +252,7 @@ int main(int argc, char **argv)
 
     fclose(file);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 unsigned int capture_sample(FILE *file, unsigned int card, unsigned int device,
