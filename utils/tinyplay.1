@@ -70,12 +70,16 @@ When playing audio, SIGINT will stop the playback and close the file.
 Plays a file called output.wav.
 
 .TP
-\fBtinyplay output.wav -D 1
+\fBtinyplay -D 1 output.wav
 Plays a file called output.wav on card 1.
 
 .TP
-\fBtinyplay output.raw -i raw --channels 2 --rate 44100 --bits 32
+\fBtinyplay -i raw --channels 2 --rate 44100 --bits 32 output.raw
 Plays a raw audio file called output.raw; using 2 channels, 44100 frames per second and 32 bits per sample.
+
+.TP
+\fBcat audio.wav | tinyplay /dev/stdin -i wav
+Plays audio data from standard input, reads the standard input as a wave file.
 
 .SH BUGS
 
