@@ -48,6 +48,7 @@
 #include <sound/asound.h>
 
 #include <tinyalsa/pcm.h>
+#include <tinyalsa/pcm-config.h>
 #include <tinyalsa/pcm-format.h>
 #include <tinyalsa/limits.h>
 
@@ -213,8 +214,8 @@ struct pcm {
     unsigned int boundary;
     /** Description of the last error that occured */
     char error[PCM_ERROR_MAX];
-    /** Configuration that was passed to @ref pcm_open */
-    struct pcm_config config;
+    /** Configuration space of the PCM */
+    struct pcm_config *config;
     struct snd_pcm_mmap_status *mmap_status;
     struct snd_pcm_mmap_control *mmap_control;
     struct snd_pcm_sync_ptr *sync_ptr;
@@ -259,7 +260,10 @@ unsigned int pcm_get_buffer_size(const struct pcm *pcm)
  */
 unsigned int pcm_get_channels(const struct pcm *pcm)
 {
-    return pcm->config.channels;
+    unsigned int channels;
+    if (pcm_config_get_channels(pcm->config, &channels) != 0)
+        return 0;
+    return channels;
 }
 
 /** Gets the PCM configuration.
@@ -273,7 +277,7 @@ const struct pcm_config * pcm_get_config(const struct pcm *pcm)
 {
     if (pcm == NULL)
         return NULL;
-    return &pcm->config;
+    return pcm->config;
 }
 
 /** Gets the rate of the PCM.
@@ -284,7 +288,10 @@ const struct pcm_config * pcm_get_config(const struct pcm *pcm)
  */
 unsigned int pcm_get_rate(const struct pcm *pcm)
 {
-    return pcm->config.rate;
+    unsigned int rate;
+    if (pcm_config_get_rate(pcm->config, &rate) != 0)
+        return 0;
+    return rate;
 }
 
 /** Gets the format of the PCM.
@@ -294,7 +301,10 @@ unsigned int pcm_get_rate(const struct pcm *pcm)
  */
 enum pcm_format pcm_get_format(const struct pcm *pcm)
 {
-    return pcm->config.format;
+    enum pcm_format format;
+    if (pcm_config_get_format(pcm->config, &format) != 0)
+        return 0;
+    return format;
 }
 
 /** Gets the file descriptor of the PCM.
@@ -333,17 +343,17 @@ int pcm_set_config(struct pcm *pcm, const struct pcm_config *config)
     if (pcm == NULL)
         return -EFAULT;
     else if (config == NULL) {
-        config = &pcm->config;
-        pcm->config.channels = 2;
-        pcm->config.rate = 48000;
-        pcm->config.period_size = 1024;
-        pcm->config.period_count = 4;
-        pcm->config.format = PCM_FORMAT_S16_LE;
-        pcm->config.start_threshold = config->period_count * config->period_size;
-        pcm->config.stop_threshold = config->period_count * config->period_size;
-        pcm->config.silence_threshold = 0;
+        config = pcm->config;
+        pcm->config->channels = 2;
+        pcm->config->rate = 48000;
+        pcm->config->period_size = 1024;
+        pcm->config->period_count = 4;
+        pcm->config->format = PCM_FORMAT_S16_LE;
+        pcm->config->start_threshold = config->period_count * config->period_size;
+        pcm->config->stop_threshold = config->period_count * config->period_size;
+        pcm->config->silence_threshold = 0;
     } else
-        pcm->config = *config;
+        *pcm->config = *config;
 
     struct snd_pcm_hw_params params;
     param_init(&params);
@@ -386,8 +396,8 @@ int pcm_set_config(struct pcm *pcm, const struct pcm_config *config)
     }
 
     /* get our refined hw_params */
-    pcm->config.period_size = param_get_int(&params, SNDRV_PCM_HW_PARAM_PERIOD_SIZE);
-    pcm->config.period_count = param_get_int(&params, SNDRV_PCM_HW_PARAM_PERIODS);
+    pcm->config->period_size = param_get_int(&params, SNDRV_PCM_HW_PARAM_PERIOD_SIZE);
+    pcm->config->period_count = param_get_int(&params, SNDRV_PCM_HW_PARAM_PERIODS);
     pcm->buffer_size = config->period_count * config->period_size;
 
     if (pcm->flags & PCM_MMAP) {
@@ -409,9 +419,9 @@ int pcm_set_config(struct pcm *pcm, const struct pcm_config *config)
 
     if (!config->start_threshold) {
         if (pcm->flags & PCM_IN)
-            pcm->config.start_threshold = sparams.start_threshold = 1;
+            pcm->config->start_threshold = sparams.start_threshold = 1;
         else
-            pcm->config.start_threshold = sparams.start_threshold =
+            pcm->config->start_threshold = sparams.start_threshold =
                 config->period_count * config->period_size / 2;
     } else
         sparams.start_threshold = config->start_threshold;
@@ -419,10 +429,10 @@ int pcm_set_config(struct pcm *pcm, const struct pcm_config *config)
     /* pick a high stop threshold - todo: does this need further tuning */
     if (!config->stop_threshold) {
         if (pcm->flags & PCM_IN)
-            pcm->config.stop_threshold = sparams.stop_threshold =
+            pcm->config->stop_threshold = sparams.stop_threshold =
                 config->period_count * config->period_size * 10;
         else
-            pcm->config.stop_threshold = sparams.stop_threshold =
+            pcm->config->stop_threshold = sparams.stop_threshold =
                 config->period_count * config->period_size;
     }
     else
@@ -461,8 +471,8 @@ unsigned int pcm_get_subdevice(const struct pcm *pcm)
  */
 unsigned int pcm_bytes_to_frames(const struct pcm *pcm, unsigned int bytes)
 {
-    return bytes / (pcm->config.channels *
-        (pcm_format_to_bits(pcm->config.format) >> 3));
+    return bytes / (pcm->config->channels *
+        (pcm_format_to_bits(pcm->config->format) >> 3));
 }
 
 /** Determines how many bytes are occupied by a number of frames of a PCM.
@@ -473,8 +483,8 @@ unsigned int pcm_bytes_to_frames(const struct pcm *pcm, unsigned int bytes)
  */
 unsigned int pcm_frames_to_bytes(const struct pcm *pcm, unsigned int frames)
 {
-    return frames * pcm->config.channels *
-        (pcm_format_to_bits(pcm->config.format) >> 3);
+    return frames * pcm->config->channels *
+        (pcm_format_to_bits(pcm->config->format) >> 3);
 }
 
 static int pcm_sync_ptr(struct pcm *pcm, int flags)
@@ -959,12 +969,19 @@ int pcm_close(struct pcm *pcm)
         munmap(pcm->mmap_buffer, pcm_frames_to_bytes(pcm, pcm->buffer_size));
     }
 
-    if (pcm->fd >= 0)
+    if (pcm->fd >= 0) {
         close(pcm->fd);
+        pcm->fd = -1;
+    }
+
+    if (pcm->config != NULL) {
+        pcm_config_free(pcm->config);
+        pcm->config = NULL;
+    }
+
     pcm->prepared = 0;
     pcm->running = 0;
     pcm->buffer_size = 0;
-    pcm->fd = -1;
     free(pcm);
     return 0;
 }
@@ -1047,6 +1064,12 @@ struct pcm *pcm_open(unsigned int card, unsigned int device,
         goto fail_close;
     }
     pcm->subdevice = info.subdevice;
+
+    pcm->config = pcm_config_malloc();
+    if (pcm->config == NULL) {
+        oops(pcm, errno, "failed to allocate PCM configuration\n");
+        return pcm;
+    }
 
     if (pcm_set_config(pcm, config) != 0)
         goto fail_close;
@@ -1354,7 +1377,7 @@ int pcm_mmap_transfer(struct pcm *pcm, const void *buffer, unsigned int bytes)
 
         /* start the audio if we reach the threshold */
         if (!pcm->running &&
-            (pcm->buffer_size - avail) >= pcm->config.start_threshold) {
+            (pcm->buffer_size - avail) >= pcm->config->start_threshold) {
             if (pcm_start(pcm) < 0) {
                fprintf(stderr, "start error: hw 0x%x app 0x%x avail 0x%x\n",
                     (unsigned int)pcm->mmap_status->hw_ptr,
