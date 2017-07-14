@@ -35,6 +35,8 @@
 #ifndef TINYALSA_PCM_H
 #define TINYALSA_PCM_H
 
+#include <tinyalsa/pcm-format.h>
+
 #include <sys/time.h>
 #include <stddef.h>
 
@@ -113,39 +115,6 @@ extern "C" {
  * @ingroup libtinyalsa-pcm
  */
 #define	PCM_STATE_DISCONNECTED 0x08
-
-/** Audio sample format of a PCM.
- * The first letter specifiers whether the sample is signed or unsigned.
- * The letter 'S' means signed. The letter 'U' means unsigned.
- * The following number is the amount of bits that the sample occupies in memory.
- * Following the underscore, specifiers whether the sample is big endian or little endian.
- * The letters 'LE' mean little endian.
- * The letters 'BE' mean big endian.
- * This enumeration is used in the @ref pcm_config structure.
- * @ingroup libtinyalsa-pcm
- */
-enum pcm_format {
-    /** Signed, 8-bit */
-    PCM_FORMAT_S8 = 1,
-    /** Signed 16-bit, little endian */
-    PCM_FORMAT_S16_LE = 0,
-    /** Signed, 16-bit, big endian */
-    PCM_FORMAT_S16_BE = 2,
-    /** Signed, 24-bit (32-bit in memory), little endian */
-    PCM_FORMAT_S24_LE,
-    /** Signed, 24-bit (32-bit in memory), big endian */
-    PCM_FORMAT_S24_BE,
-    /** Signed, 24-bit, little endian */
-    PCM_FORMAT_S24_3LE,
-    /** Signed, 24-bit, big endian */
-    PCM_FORMAT_S24_3BE,
-    /** Signed, 32-bit, little endian */
-    PCM_FORMAT_S32_LE,
-    /** Signed, 32-bit, big endian */
-    PCM_FORMAT_S32_BE,
-    /** Max of the enumeration list, not an actual format. */
-    PCM_FORMAT_MAX
-};
 
 /** A bit mask of 256 bits (32 bytes) that describes some hardware parameters of a PCM */
 struct pcm_mask {
@@ -257,8 +226,6 @@ int pcm_get_file_descriptor(const struct pcm *pcm);
 const char *pcm_get_error(const struct pcm *pcm);
 
 int pcm_set_config(struct pcm *pcm, const struct pcm_config *config);
-
-unsigned int pcm_format_to_bits(enum pcm_format format);
 
 unsigned int pcm_get_buffer_size(const struct pcm *pcm);
 

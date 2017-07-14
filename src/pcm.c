@@ -48,6 +48,7 @@
 #include <sound/asound.h>
 
 #include <tinyalsa/pcm.h>
+#include <tinyalsa/pcm-format.h>
 #include <tinyalsa/limits.h>
 
 #define PARAM_MAX SNDRV_PCM_HW_PARAM_LAST_INTERVAL
@@ -450,31 +451,6 @@ int pcm_set_config(struct pcm *pcm, const struct pcm_config *config)
 unsigned int pcm_get_subdevice(const struct pcm *pcm)
 {
     return pcm->subdevice;
-}
-
-/** Determines the number of bits occupied by a @ref pcm_format.
- * @param format A PCM format.
- * @return The number of bits associated with @p format
- * @ingroup libtinyalsa-pcm
- */
-unsigned int pcm_format_to_bits(enum pcm_format format)
-{
-    switch (format) {
-    case PCM_FORMAT_S32_LE:
-    case PCM_FORMAT_S32_BE:
-    case PCM_FORMAT_S24_LE:
-    case PCM_FORMAT_S24_BE:
-        return 32;
-    case PCM_FORMAT_S24_3LE:
-    case PCM_FORMAT_S24_3BE:
-        return 24;
-    default:
-    case PCM_FORMAT_S16_LE:
-    case PCM_FORMAT_S16_BE:
-        return 16;
-    case PCM_FORMAT_S8:
-        return 8;
-    };
 }
 
 /** Determines how many frames of a PCM can fit into a number of bytes.
