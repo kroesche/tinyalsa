@@ -48,8 +48,6 @@ void tinyplay_print_help(const char *argv0)
     fprintf(stderr, "  -c, --channels <count>        The amount of channels per frame.\n");
     fprintf(stderr, "  -r, --rate <rate>             The amount of frames per second.\n");
     fprintf(stderr, "  -f, --format <format>         The sample format of the PCM.\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "File argument may be a file path or '--' to indicate stdin.\n");
 }
 
 void tinyplay_print_version(const char *argv0)
@@ -217,14 +215,10 @@ int ctx_init(struct ctx* ctx, const struct cmd *cmd)
     unsigned int bits = cmd->bits;
     struct pcm_config config = cmd->config;
 
-    if (strcmp(cmd->filename, "--") == 0) {
-        ctx->file = stdin;
-    } else {
-        ctx->file = fopen(cmd->filename, "rb");
-        if (ctx->file == NULL) {
-            fprintf(stderr, "Failed to open '%s'.\n", cmd->filename);
-            return -1;
-        }
+    ctx->file = fopen(cmd->filename, "rb");
+    if (ctx->file == NULL) {
+        fprintf(stderr, "Failed to open '%s'.\n", cmd->filename);
+        return -1;
     }
 
     if ((cmd->filetype != NULL) && (strcmp(cmd->filetype, "wav") == 0)) {

@@ -86,8 +86,6 @@ void tinycap_print_help(const char *argv0)
     fprintf(stderr, "\t-p, --period-size\n");
     fprintf(stderr, "\t-P, --period-count\n");
     fprintf(stderr, "\t-t, --time\n");
-    fprintf(stderr, "\n");
-    fprintf(stderr, "The file argument may be a path to a file or stdout, indicated by '--'.\n");
 }
 
 void tinycap_print_version(const char *argv0)
@@ -187,16 +185,10 @@ int main(int argc, char **argv)
         filename = argv[optind];
     }
 
-    if (strcmp(filename,"--") == 0) {
-        file = stdout;
-        prinfo = 0;
-        no_header = 1;
-    } else {
-        file = fopen(filename, "wb");
-        if (!file) {
-            fprintf(stderr, "Unable to create file '%s'.\n", argv[1]);
-            return EXIT_FAILURE;
-        }
+    file = fopen(filename, "wb");
+    if (!file) {
+        fprintf(stderr, "Unable to create file '%s'.\n", argv[1]);
+        return EXIT_FAILURE;
     }
 
     header.riff_id = ID_RIFF;
