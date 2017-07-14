@@ -1,4 +1,4 @@
-/* pcm.h
+/* pcm-config.h
 **
 ** Copyright 2011, The Android Open Source Project
 **
@@ -28,8 +28,8 @@
 
 /** @file */
 
-#ifndef TINYALSA_PCM_H
-#define TINYALSA_PCM_H
+#ifndef TINYALSA_PCM_CONFIG_H
+#define TINYALSA_PCM_CONFIG_H
 
 #if defined(__cplusplus)
 extern "C" {
