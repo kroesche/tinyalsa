@@ -751,7 +751,11 @@ struct pcm *pcm_open(unsigned int card, unsigned int device,
              flags & PCM_IN ? 'c' : 'p');
 
     pcm->flags = flags;
-    pcm->fd = open(fn, O_RDWR);
+    if (flags & PCM_NONBLOCK)
+        pcm->fd = open(fn, O_RDWR | O_NONBLOCK);
+    else
+        pcm->fd = open(fd, O_RDWR);
+
     if (pcm->fd < 0) {
         oops(pcm, errno, "cannot open device '%s'", fn);
         return pcm;

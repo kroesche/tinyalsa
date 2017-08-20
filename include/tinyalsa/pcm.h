@@ -90,6 +90,12 @@ extern "C" {
  */
 #define PCM_MONOTONIC 0x00000008
 
+/** When set, the PCM will not block during
+ * calls to open, read or write.
+ * @ingroup libtinyalsa-pcm
+ */
+#define PCM_NONBLOCK  0x00000010
+
 /** For inputs, this means the PCM is recording audio samples.
  * For outputs, this means the PCM is playing audio samples.
  * @ingroup libtinyalsa-pcm
